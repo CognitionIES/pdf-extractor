@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Extractor</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        #results { margin-top: 20px; }
+        #progressBar { width: 100%; height: 20px; margin: 10px 0; }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px; height: 30px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <h1>Upload PDFs for Extraction</h1>
+    <form id="uploadForm">
+        <input type="file" id="files" name="files" multiple accept=".pdf" required>
+        <button type="submit">Upload and Process</button>
+    </form>
+
+    <!-- Upload Progress -->
+    <progress id="progressBar" value="0" max="100" class="hidden"></progress>
+    <div id="uploadStatus"></div>
+
+    <!-- Processing Loader -->
+    <div id="processingStatus" class="hidden">
+        <div class="spinner"></div>
+        <span id="processingText">Processing: 0 of 0...</span>
+    </div>
+
+    <!-- Results -->
+    <div id="results"></div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
