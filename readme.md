@@ -109,4 +109,4 @@ When processing a piping diagram, the extractor generates:
 ### License
 
 This project is open-source under the MIT License.
-Feel free to use, modify, and extend it for your own PDF data processing workflows.
+Feel free to use, modify, and extend it for your own PDF data processing workflows
