@@ -1,5 +1,3 @@
-document.getElementById('progressSection').classList.remove('hidden');
-
 document.getElementById('uploadForm').addEventListener('submit', function(e) {
     e.preventDefault();
     const files = document.getElementById('files').files;
