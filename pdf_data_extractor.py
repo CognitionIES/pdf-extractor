@@ -5,6 +5,23 @@ import re
 import json
 from pathlib import Path
 
+def convert_to_serializable(obj):
+    """Convert PyPDF2 objects to JSON-serializable types"""
+    if hasattr(obj, '__iter__') and not isinstance(obj, (str, bytes)):
+        if isinstance(obj, dict):
+            return {k: convert_to_serializable(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [convert_to_serializable(item) for item in obj]
+        else:
+            return list(obj)
+    elif hasattr(obj, 'get_object'):
+        return convert_to_serializable(obj.get_object())
+    elif isinstance(obj, (int, float, str, bool, type(None))):
+        return obj
+    else:
+        # Convert any other type to string (includes FloatObject, etc.)
+        return str(obj)
+
 def extract_pdf_data(pdf_path):
     results = {
         'text_content': [],
@@ -50,11 +67,11 @@ def extract_pdf_data(pdf_path):
                     for char in chars:
                         page_coords.append({
                             'text': char['text'],
-                            'x0': char['x0'],
-                            'y0': char['y0'],
-                            'x1': char['x1'],
-                            'y1': char['y1'],
-                            'size': char['size']
+                            'x0': float(char['x0']),
+                            'y0': float(char['y0']),
+                            'x1': float(char['x1']),
+                            'y1': float(char['y1']),
+                            'size': float(char['size'])
                         })
                     results['coordinates_data'].append({
                         'page': i+1,
@@ -67,11 +84,11 @@ def extract_pdf_data(pdf_path):
                     page_lines = []
                     for line in lines:
                         page_lines.append({
-                            'x0': line['x0'],
-                            'y0': line['y0'],
-                            'x1': line['x1'],
-                            'y1': line['y1'],
-                            'width': line['width']
+                            'x0': float(line['x0']),
+                            'y0': float(line['y0']),
+                            'x1': float(line['x1']),
+                            'y1': float(line['y1']),
+                            'width': float(line.get('width', 0))
                         })
                     if 'lines' not in results:
                         results['lines'] = []
@@ -86,12 +103,12 @@ def extract_pdf_data(pdf_path):
                     page_rects = []
                     for rect in rects:
                         page_rects.append({
-                            'x0': rect['x0'],
-                            'y0': rect['y0'],
-                            'x1': rect['x1'],
-                            'y1': rect['y1'],
-                            'width': rect['width'],
-                            'height': rect['height']
+                            'x0': float(rect['x0']),
+                            'y0': float(rect['y0']),
+                            'x1': float(rect['x1']),
+                            'y1': float(rect['y1']),
+                            'width': float(rect.get('width', 0)),
+                            'height': float(rect.get('height', 0))
                         })
                     if 'rectangles' not in results:
                         results['rectangles'] = []
@@ -111,11 +128,11 @@ def extract_pdf_data(pdf_path):
             # Get metadata
             if pdf_reader.metadata:
                 results['metadata'].update({
-                    'title': pdf_reader.metadata.get('/Title', ''),
-                    'author': pdf_reader.metadata.get('/Author', ''),
-                    'subject': pdf_reader.metadata.get('/Subject', ''),
-                    'creator': pdf_reader.metadata.get('/Creator', ''),
-                    'producer': pdf_reader.metadata.get('/Producer', ''),
+                    'title': str(pdf_reader.metadata.get('/Title', '')),
+                    'author': str(pdf_reader.metadata.get('/Author', '')),
+                    'subject': str(pdf_reader.metadata.get('/Subject', '')),
+                    'creator': str(pdf_reader.metadata.get('/Creator', '')),
+                    'producer': str(pdf_reader.metadata.get('/Producer', '')),
                     'creation_date': str(pdf_reader.metadata.get('/CreationDate', '')),
                     'modification_date': str(pdf_reader.metadata.get('/ModDate', ''))
                 })
@@ -124,15 +141,23 @@ def extract_pdf_data(pdf_path):
             for i, page in enumerate(pdf_reader.pages):
                 if '/Annots' in page:
                     for annot in page['/Annots']:
-                        annotation = annot.get_object()
-                        if annotation:
-                            results['annotations'].append({
-                                'page': i+1,
-                                'type': str(annotation.get('/Subtype', '')),
-                                'content': str(annotation.get('/Contents', '')),
-                                'rect': annotation.get('/Rect', []),
-                                'name': str(annotation.get('/NM', ''))
-                            })
+                        try:
+                            annotation = annot.get_object()
+                            if annotation:
+                                # Convert rect to list of floats
+                                rect = annotation.get('/Rect', [])
+                                rect_list = [float(x) for x in rect] if rect else []
+                                
+                                results['annotations'].append({
+                                    'page': i+1,
+                                    'type': str(annotation.get('/Subtype', '')),
+                                    'content': str(annotation.get('/Contents', '')),
+                                    'rect': rect_list,
+                                    'name': str(annotation.get('/NM', ''))
+                                })
+                        except Exception as e:
+                            print(f"Error extracting annotation on page {i+1}: {e}")
+                            continue
                 
     except Exception as e:
         print(f"Error with PyPDF2: {e}")
@@ -202,16 +227,20 @@ def analyze_piping_data(results):
 def save_results(results, piping_analysis, output_dir):
     output_path = Path(output_dir)
     
+    # Convert results to JSON-serializable format
+    serializable_results = convert_to_serializable(results)
+    serializable_analysis = convert_to_serializable(piping_analysis)
+    
     # Save raw results as JSON
     with open(output_path / 'pdf_extraction_results.json', 'w', encoding='utf-8') as f:
-        json.dump(results, f, indent=2, ensure_ascii=False)
+        json.dump(serializable_results, f, indent=2, ensure_ascii=False)
     
     # Save piping analysis as JSON
     with open(output_path / 'piping_analysis.json', 'w', encoding='utf-8') as f:
-        json.dump(piping_analysis, f, indent=2, ensure_ascii=False)
+        json.dump(serializable_analysis, f, indent=2, ensure_ascii=False)
     
     # Create Excel file with different sheets
-    with pd.ExcelWriter(output_path / 'piping_data_extracted.xlsx') as writer:
+    with pd.ExcelWriter(output_path / 'piping_data_extracted.xlsx', engine='openpyxl') as writer:
         
         # Metadata sheet
         if results['metadata']:
@@ -262,3 +291,5 @@ def save_results(results, piping_analysis, output_dir):
         if piping_analysis['coordinate_patterns']:
             coord_df = pd.DataFrame(piping_analysis['coordinate_patterns'])
             coord_df.to_excel(writer, sheet_name='Coordinate_Patterns', index=False)
+    
+    print(f"Results saved to {output_path}")
