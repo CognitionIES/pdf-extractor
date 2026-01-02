@@ -1,4 +1,4 @@
-document.getElementById('uploadForm').addEventListener('submit', function(e) {
+document.getElementById('uploadForm').addEventListener('submit', function (e) {
     e.preventDefault();
     const files = document.getElementById('files').files;
     if (files.length === 0) {
@@ -30,7 +30,7 @@ document.getElementById('uploadForm').addEventListener('submit', function(e) {
     xhr.open('POST', '/upload', true);
 
     // Upload Progress
-    xhr.upload.addEventListener('progress', function(event) {
+    xhr.upload.addEventListener('progress', function (event) {
         if (event.lengthComputable) {
             const percent = (event.loaded / event.total) * 100;
             progressBar.value = percent;
@@ -38,25 +38,30 @@ document.getElementById('uploadForm').addEventListener('submit', function(e) {
         }
     });
 
-    xhr.onload = function() {
+    xhr.onload = function () {
         if (xhr.status === 200) {
             const data = JSON.parse(xhr.responseText);
             taskId = data.task_id;
 
-            // Hide upload, show processing
             progressBar.classList.add('hidden');
             uploadStatus.textContent = 'Upload complete. Processing...';
             processingStatus.classList.remove('hidden');
             processingText.textContent = 'Processing: 0 of 0...';
 
-            // Start polling
             pollStatus(taskId);
         } else {
-            uploadStatus.textContent = 'Upload failed.';
+            // Show error details
+            try {
+                const errorData = JSON.parse(xhr.responseText);
+                uploadStatus.textContent = `Upload failed: ${errorData.error || 'Unknown error'}`;
+            } catch {
+                uploadStatus.textContent = `Upload failed with status ${xhr.status}`;
+            }
+            console.error('Server response:', xhr.responseText);
         }
     };
 
-    xhr.onerror = function() {
+    xhr.onerror = function () {
         uploadStatus.textContent = 'Upload error.';
     };
 
